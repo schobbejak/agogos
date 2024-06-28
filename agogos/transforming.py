@@ -2,17 +2,18 @@
 
 import copy
 import warnings
-from abc import abstractmethod
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from agogos._core import _Base, _Block, _ParallelSystem, _SequentialSystem
 
+_T = TypeVar("_T")
+_R = TypeVar("_R")
 
-class TransformType(_Base):
+
+class TransformType(Generic[_T, _R], _Base):
     """Abstract transform type describing a class that implements the transform function."""
 
-    @abstractmethod
-    def transform(self, data: Any, **transform_args: Any) -> Any:  # noqa: ANN401
+    def transform(self, data: _T, **transform_args: Any) -> _T | _R:
         """Transform the input data.
 
         :param data: The input data.
@@ -22,7 +23,7 @@ class TransformType(_Base):
         raise NotImplementedError(f"{self.__class__.__name__} does not implement transform method.")
 
 
-class Transformer(TransformType, _Block):
+class Transformer(TransformType[_T, _R], _Block):
     """The transformer block transforms any data it could be x or y data.
 
     Methods:
@@ -59,7 +60,7 @@ class Transformer(TransformType, _Block):
     """
 
 
-class TransformingSystem(TransformType, _SequentialSystem):
+class TransformingSystem(TransformType[_T, _R], _SequentialSystem):
     """A system that transforms the input data.
 
     Parameters:
@@ -99,12 +100,12 @@ class TransformingSystem(TransformType, _SequentialSystem):
         """Post init method for the TransformingSystem class."""
         # Assert all steps are a subclass of Transformer
         for step in self.steps:
-            if not isinstance(step, (TransformType)):
+            if not isinstance(step, TransformType):
                 raise TypeError(f"{step} is not an instance of TransformType")
 
         super().__post_init__()
 
-    def transform(self, data: Any, **transform_args: Any) -> Any:  # noqa: ANN401
+    def transform(self, data: _T, **transform_args: Any) -> _T | _R:
         """Transform the input data.
 
         :param data: The input data.
@@ -123,7 +124,7 @@ class TransformingSystem(TransformType, _SequentialSystem):
             step_name = step.__class__.__name__
 
             step_args = transform_args.get(step_name, {})
-            if isinstance(step, (TransformType)):
+            if isinstance(step, TransformType):
                 data = step.transform(data, **step_args)
             else:
                 raise TypeError(f"{step} is not an instance of TransformType")
@@ -131,7 +132,7 @@ class TransformingSystem(TransformType, _SequentialSystem):
         return data
 
 
-class ParallelTransformingSystem(TransformType, _ParallelSystem):
+class ParallelTransformingSystem(TransformType[_T, _R], _ParallelSystem[_R]):
     """A system that transforms the input data in parallel.
 
     Parameters:
@@ -179,31 +180,34 @@ class ParallelTransformingSystem(TransformType, _ParallelSystem):
         """Post init method for the ParallelTransformingSystem class."""
         # Assert all steps are a subclass of Transformer or TransformingSystem
         for step in self.steps:
-            if not isinstance(step, (TransformType)):
+            if not isinstance(step, TransformType):
                 raise TypeError(f"{step} is not an instance of TransformType")
 
         super().__post_init__()
 
-    def transform(self, data: Any, **transform_args: Any) -> Any:  # noqa: ANN401
+    def transform(self, data: _T, **transform_args: Any) -> _T | _R:
         """Transform the input data.
 
         :param data: The input data.
+        :param transform_args: Additional arguments.
         :return: The transformed data.
         """
-        # Loop through each step and call the transform method
-        out_data = None
-        if len(self.get_steps()) == 0:
+        if len(self.get_steps()) < 1:
             return data
 
+        out_data = None
         for i, step in enumerate(self.get_steps()):
             step_name = step.__class__.__name__
 
             step_args = transform_args.get(step_name, {})
 
-            if isinstance(step, (TransformType)):
+            if isinstance(step, TransformType):
                 step_data = step.transform(copy.deepcopy(data), **step_args)
                 out_data = self.concat(out_data, step_data, self.get_weights()[i])
             else:
                 raise TypeError(f"{step} is not an instance of TransformType")
+
+        if out_data is None:
+            raise ValueError("Transformation output is None.")
 
         return out_data

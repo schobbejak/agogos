@@ -28,7 +28,7 @@ class TestTransformer:
 
     def test_transformer_hash(self):
         transformer = Transformer()
-        assert transformer.get_hash() == "1cbcc4f2d0921b050d9b719d2beb6529"
+        assert transformer.get_hash() == "6afa3259ad9293ce2c3ff6ca58ab8d68"
 
 
 class TestTransformingSystem:
@@ -300,12 +300,12 @@ class TestParallelTransformingSystem:
             system.transform([1, 2, 3])
 
     def test_transform_parallel_hashes(self):
-        class SubTransformer1(Transformer):
-            def transform(self, x):
+        class SubTransformer1(Transformer[int, int]):
+            def transform(self, x: int, **kwargs) -> int:
                 return x
 
-        class SubTransformer2(Transformer):
-            def transform(self, x):
+        class SubTransformer2(Transformer[int, int]):
+            def transform(self, x: int, **kwargs) -> int:
                 return x * 2
 
         block1 = SubTransformer1()

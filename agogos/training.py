@@ -2,39 +2,43 @@
 
 import copy
 import warnings
-from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar, cast
 
 from joblib import hash
 
 from agogos._core import _Base, _Block, _ParallelSystem, _SequentialSystem
 from agogos.transforming import TransformingSystem
 
+_XT = TypeVar("_XT")
+_YT = TypeVar("_YT")
+_PT = TypeVar("_PT")
 
-class TrainType(_Base):
+
+class TrainType(Generic[_XT, _YT, _PT], _Base):
     """Abstract train type describing a class that implements two functions train and predict."""
 
-    @abstractmethod
-    def train(self, x: Any, y: Any, **train_args: Any) -> tuple[Any, Any]:  # noqa: ANN401
+    def train(self, x: _XT, y: _YT, **train_args: Any) -> tuple[_XT | _PT, _YT]:
         """Train the block.
 
         :param x: The input data.
         :param y: The target variable.
+        :param train_args: The arguments to pass to the training system.
+        :return: The predictions and the target variable.
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not implement train method.")
 
-    @abstractmethod
-    def predict(self, x: Any, **pred_args: Any) -> Any:  # noqa: ANN401
+    def predict(self, x: _XT, **pred_args: Any) -> _XT | _PT:
         """Predict the target variable.
 
         :param x: The input data.
+        :param pred_args: The arguments to pass to the prediction system.
         :return: The predictions.
         """
         raise NotImplementedError(f"{self.__class__.__name__} does not implement predict method.")
 
 
-class Trainer(TrainType, _Block):
+class Trainer(TrainType[_XT, _YT, _PT], _Block):
     """The trainer block is for blocks that need to train on two inputs and predict on one.
 
     Methods:
@@ -80,7 +84,7 @@ class Trainer(TrainType, _Block):
     """
 
 
-class TrainingSystem(TrainType, _SequentialSystem):
+class TrainingSystem(TrainType[_XT, _YT, _PT], _SequentialSystem):
     """A system that trains on the input data and labels.
 
     Parameters:
@@ -118,17 +122,17 @@ class TrainingSystem(TrainType, _SequentialSystem):
 
     def __post_init__(self) -> None:
         """Post init method for the TrainingSystem class."""
-        # Assert all steps are a subclass of Trainer
+        # Assert all steps are a subclass of TrainType
         for step in self.steps:
             if not isinstance(
                 step,
-                (TrainType),
+                TrainType,
             ):
                 raise TypeError(f"step: {step} is not an instance of TrainType")
 
         super().__post_init__()
 
-    def train(self, x: Any, y: Any, **train_args: Any) -> tuple[Any, Any]:  # noqa: ANN401
+    def train(self, x: _XT, y: _YT, **train_args: Any) -> tuple[_XT | _PT, _YT]:
         """Train the system.
 
         :param x: The input to the system.
@@ -153,14 +157,14 @@ class TrainingSystem(TrainType, _SequentialSystem):
             step_name = step.__class__.__name__
 
             step_args = train_args.get(step_name, {})
-            if isinstance(step, (TrainType)):
+            if isinstance(step, TrainType):
                 x, y = step.train(x, y, **step_args)
             else:
                 raise TypeError(f"{step} is not an instance of TrainType")
 
         return x, y
 
-    def predict(self, x: Any, **pred_args: Any) -> Any:  # noqa: ANN401
+    def predict(self, x: _XT, **pred_args: Any) -> _XT | _PT:
         """Predict the output of the system.
 
         :param x: The input to the system.
@@ -185,7 +189,7 @@ class TrainingSystem(TrainType, _SequentialSystem):
 
             step_args = pred_args.get(step_name, {})
 
-            if isinstance(step, (TrainType)):
+            if isinstance(step, TrainType):
                 x = step.predict(x, **step_args)
             else:
                 raise TypeError(f"{step} is not an instance of TrainType")
@@ -193,7 +197,7 @@ class TrainingSystem(TrainType, _SequentialSystem):
         return x
 
 
-class ParallelTrainingSystem(TrainType, _ParallelSystem):
+class ParallelTrainingSystem(TrainType[_XT, _YT, _PT], _ParallelSystem[_PT]):
     """A system that trains the input data in parallel.
 
     Parameters:
@@ -236,12 +240,12 @@ class ParallelTrainingSystem(TrainType, _ParallelSystem):
         """Post init method for the ParallelTrainingSystem class."""
         # Assert all steps correct instances
         for step in self.steps:
-            if not isinstance(step, (TrainType)):
+            if not isinstance(step, TrainType):
                 raise TypeError(f"{step} is not an instance of TrainType")
 
         super().__post_init__()
 
-    def train(self, x: Any, y: Any, **train_args: Any) -> tuple[Any, Any]:  # noqa: ANN401
+    def train(self, x: _XT, y: _YT, **train_args: Any) -> tuple[_PT, _YT]:
         """Train the system.
 
         :param x: The input to the system.
@@ -255,7 +259,7 @@ class ParallelTrainingSystem(TrainType, _ParallelSystem):
 
             step_args = train_args.get(step_name, {})
 
-            if isinstance(step, (TrainType)):
+            if isinstance(step, TrainType):
                 step_x, step_y = step.train(copy.deepcopy(x), copy.deepcopy(y), **step_args)
                 out_x, out_y = (
                     self.concat(out_x, step_x, self.get_weights()[i]),
@@ -264,9 +268,12 @@ class ParallelTrainingSystem(TrainType, _ParallelSystem):
             else:
                 raise TypeError(f"{step} is not an instance of TrainType")
 
+        if out_x is None or out_y is None:
+            raise ValueError("No steps were executed in the training system.")
+
         return out_x, out_y
 
-    def predict(self, x: Any, **pred_args: Any) -> Any:  # noqa: ANN401
+    def predict(self, x: _XT, **pred_args: Any) -> _PT:
         """Predict the output of the system.
 
         :param x: The input to the system.
@@ -279,15 +286,18 @@ class ParallelTrainingSystem(TrainType, _ParallelSystem):
 
             step_args = pred_args.get(step_name, {})
 
-            if isinstance(step, (TrainType)):
+            if isinstance(step, TrainType):
                 step_x = step.predict(copy.deepcopy(x), **step_args)
                 out_x = self.concat(out_x, step_x, self.get_weights()[i])
             else:
                 raise TypeError(f"{step} is not an instance of TrainType")
 
+        if out_x is None:
+            raise ValueError("Predictions output is None.")
+
         return out_x
 
-    def concat_labels(self, original_data: Any, data_to_concat: Any, weight: float = 1.0) -> Any:  # noqa: ANN401
+    def concat_labels(self, original_data: _YT | None, data_to_concat: _YT, weight: float = 1.0) -> _YT:
         """Concatenate the transformed labels. Will use concat method if not overridden.
 
         :param original_data: The first input data.
@@ -295,11 +305,11 @@ class ParallelTrainingSystem(TrainType, _ParallelSystem):
         :param weight: Weight of data to concat.
         :return: The concatenated data.
         """
-        return self.concat(original_data, data_to_concat, weight)
+        return cast(_YT, self.concat(cast(_PT | None, original_data), cast(_PT, data_to_concat), weight))
 
 
 @dataclass
-class Pipeline(TrainType):
+class Pipeline(TrainType[_XT, _YT, _PT]):
     """A pipeline of systems that can be trained and predicted.
 
     Parameters:
@@ -344,11 +354,11 @@ class Pipeline(TrainType):
         predictions = pipeline.predict(x)
     """
 
-    x_sys: TransformingSystem | None = None
-    y_sys: TransformingSystem | None = None
-    train_sys: Trainer | TrainingSystem | ParallelTrainingSystem | None = None
-    pred_sys: TransformingSystem | None = None
-    label_sys: TransformingSystem | None = None
+    x_sys: TransformingSystem[_XT, _XT] | None = None
+    y_sys: TransformingSystem[_YT, _YT] | None = None
+    train_sys: Trainer[_XT, _YT, _PT] | TrainingSystem[_XT, _YT, _PT] | ParallelTrainingSystem[_XT, _YT, _PT] | None = None
+    pred_sys: TransformingSystem[_XT | _PT, _XT | _PT] | None = None
+    label_sys: TransformingSystem[_YT, _YT] | None = None
 
     def __post_init__(self) -> None:
         """Post initialization function of the Pipeline."""
@@ -371,7 +381,7 @@ class Pipeline(TrainType):
 
         self._set_children(children)
 
-    def train(self, x: Any, y: Any, **train_args: Any) -> tuple[Any, Any]:  # noqa: ANN401
+    def train(self, x: _XT, y: _YT, **train_args: Any) -> tuple[_XT | _PT, _YT]:
         """Train the system.
 
         :param x: The input to the system.
@@ -383,16 +393,18 @@ class Pipeline(TrainType):
             x = self.x_sys.transform(x, **train_args.get("x_sys", {}))
         if self.y_sys is not None:
             y = self.y_sys.transform(y, **train_args.get("y_sys", {}))
+
+        predictions: _XT | _PT = x
         if self.train_sys is not None:
-            x, y = self.train_sys.train(x, y, **train_args.get("train_sys", {}))
+            predictions, y = self.train_sys.train(x, y, **train_args.get("train_sys", {}))
         if self.pred_sys is not None:
-            x = self.pred_sys.transform(x, **train_args.get("pred_sys", {}))
+            predictions = self.pred_sys.transform(predictions, **train_args.get("pred_sys", {}))
         if self.label_sys is not None:
             y = self.label_sys.transform(y, **train_args.get("label_sys", {}))
 
-        return x, y
+        return predictions, y
 
-    def predict(self, x: Any, **pred_args: Any) -> Any:  # noqa: ANN401
+    def predict(self, x: _XT, **pred_args: Any) -> _XT | _PT:
         """Predict the output of the system.
 
         :param x: The input to the system.
@@ -401,12 +413,14 @@ class Pipeline(TrainType):
         """
         if self.x_sys is not None:
             x = self.x_sys.transform(x, **pred_args.get("x_sys", {}))
-        if self.train_sys is not None:
-            x = self.train_sys.predict(x, **pred_args.get("train_sys", {}))
-        if self.pred_sys is not None:
-            x = self.pred_sys.transform(x, **pred_args.get("pred_sys", {}))
 
-        return x
+        predictions: _XT | _PT = x
+        if self.train_sys is not None:
+            predictions = self.train_sys.predict(x, **pred_args.get("train_sys", {}))
+        if self.pred_sys is not None:
+            predictions = self.pred_sys.transform(predictions, **pred_args.get("pred_sys", {}))
+
+        return predictions
 
     def _set_hash(self, prev_hash: str) -> None:
         """Set the hash of the pipeline.

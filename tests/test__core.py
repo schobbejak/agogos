@@ -9,7 +9,7 @@ class Test_Base:
         assert base is not None
 
     def test_get_hash(self):
-        assert _Base().get_hash() == "be5a33685928d3da88062f187295a019"
+        assert _Base().get_hash() == "e75c7852dd3d36ffc2f1b90efa9568d8"
 
     def test_set_hash(self):
         base = _Base()
@@ -39,7 +39,7 @@ class Test_Base:
         base = _Base()
         assert (
             base._repr_html_()
-            == "<div style='border: 1px solid black; padding: 10px;'><p><strong>Class:</strong> _Base</p><ul><li><strong>Hash:</strong> be5a33685928d3da88062f187295a019</li><li><strong>Parent:</strong> None</li><li><strong>Children:</strong> None</li></ul></div>"
+            == "<div style='border: 1px solid black; padding: 10px;'><p><strong>Class:</strong> _Base</p><ul><li><strong>Hash:</strong> e75c7852dd3d36ffc2f1b90efa9568d8</li><li><strong>Parent:</strong> None</li><li><strong>Children:</strong> None</li></ul></div>"
         )
 
     def test_save_to_html(self):
@@ -60,17 +60,17 @@ class TestBlock:
         block = _Block()
         block._set_hash("")
         hash1 = block.get_hash()
-        assert hash1 == "04714d9ee40c9baff8c528ed982a103c"
+        assert hash1 == "8c52898e95f367f12e9079cc62d141cb"
         block._set_hash(hash1)
         hash2 = block.get_hash()
-        assert hash2 == "83196595c42f8eff9218c0ac8f80faf0"
+        assert hash2 == "243051d47d23a36250057824eed90525"
         assert hash1 != hash2
 
     def test_block_get_hash(self):
         block = _Block()
         block._set_hash("")
         hash1 = block.get_hash()
-        assert hash1 == "04714d9ee40c9baff8c528ed982a103c"
+        assert hash1 == "8c52898e95f367f12e9079cc62d141cb"
 
     def test__repr_html_(self):
         block_instance = _Block()
@@ -93,7 +93,7 @@ class TestSequentialSystem:
         block1 = _Block()
 
         system = _SequentialSystem([block1])
-        assert system.get_hash() == "04714d9ee40c9baff8c528ed982a103c"
+        assert system.get_hash() == "8c52898e95f367f12e9079cc62d141cb"
         assert block1.get_hash() == system.get_hash()
 
     def test_system_hash_with_2_steps(self):
@@ -103,7 +103,7 @@ class TestSequentialSystem:
         system = _SequentialSystem([block1, block2])
         assert system.get_hash() != block1.get_hash()
         assert (
-            system.get_hash() == block2.get_hash() == "83196595c42f8eff9218c0ac8f80faf0"
+            system.get_hash() == block2.get_hash() == "a60a4a1d474b8454b0ee9197875171f6"
         )
 
     def test_system_hash_with_3_steps(self):
@@ -116,7 +116,7 @@ class TestSequentialSystem:
         assert system.get_hash() != block2.get_hash()
         assert block1.get_hash() != block2.get_hash()
         assert (
-            system.get_hash() == block3.get_hash() == "5aaa5f0962baedf36f132ad39380761e"
+            system.get_hash() == block3.get_hash() == "dfebfe0e709805bd8bc328d115400929"
         )
 
     def test__repr_html_(self):
@@ -140,7 +140,7 @@ class TestParallelSystem:
         block1 = _Block()
 
         system = _ParallelSystem([block1])
-        assert system.get_hash() == "04714d9ee40c9baff8c528ed982a103c"
+        assert system.get_hash() == "8c52898e95f367f12e9079cc62d141cb"
         assert block1.get_hash() == system.get_hash()
 
     def test_parallel_system_hash_with_2_steps(self):
@@ -151,7 +151,7 @@ class TestParallelSystem:
         assert system.get_hash() != block1.get_hash()
         assert block1.get_hash() == block2.get_hash()
         assert system.get_hash() != block2.get_hash()
-        assert system.get_hash() == "9689e0f292013df811f8e910684406f7"
+        assert system.get_hash() == "6430f15bf7782822914896704610d45d"
 
     def test_parallel_system_hash_with_3_steps(self):
         block1 = _Block()
@@ -163,7 +163,7 @@ class TestParallelSystem:
         assert system.get_hash() != block2.get_hash()
         assert system.get_hash() != block3.get_hash()
         assert block1.get_hash() == block2.get_hash() == block3.get_hash()
-        assert system.get_hash() == "b5ea75f99dbfb82c35e082c88b94bda7"
+        assert system.get_hash() == "e4e48c6863f83ed0e876357da5a6ed24"
 
     def test_parallel_system__repr_html_(self):
         block_instance = _Block()

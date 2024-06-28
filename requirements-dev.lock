@@ -12,6 +12,8 @@
 -e file:.
 alabaster==0.7.16
     # via sphinx
+annotated-types==0.7.0
+    # via agogos
 babel==2.15.0
     # via sphinx
 beautifulsoup4==4.12.3

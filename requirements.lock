@@ -10,5 +10,7 @@
 --index-url https://pypi.org/simple/
 
 -e file:.
+annotated-types==0.7.0
+    # via agogos
 joblib==1.4.2
     # via agogos

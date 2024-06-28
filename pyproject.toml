@@ -23,7 +23,8 @@ classifiers = [
     "Intended Audience :: Developers"
 ]
 dependencies= [
-    "joblib>=1.4.0"
+    "joblib>=1.4.0",
+    "annotated-types>=0.7.0",
 ]
 
 [project.urls]
