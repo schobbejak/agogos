@@ -1,4 +1,5 @@
 """This module contains the core classes for all classes in the agogos package."""
+
 from abc import abstractmethod
 from dataclasses import field, dataclass
 from pathlib import Path
